@@ -160,7 +160,7 @@ begin
   slCommentOut        := TStringList.Create;
   coChar              := '';
 
-  callIsolator     := false;
+  callIsolator        := false;
   useFormID           := false;
 
   disableAll          := false;
@@ -214,14 +214,18 @@ begin
   slCommentOut.Values['Outfit']    := '';
 
   if framework = 'SkyPatcher' then
-    checkBoxCaption := 'Choose SkyPatcher Option'
+    checkBoxCaption := '  Choose SkyPatcher Option'
   else if framework = 'Recast' then
-    checkBoxCaption := 'Choose Recast Option'
+    checkBoxCaption := '  Choose Recast Option'
   else
-    checkBoxCaption := 'Choose RDF Option';
+    checkBoxCaption := '  Choose RDF Option';
 
-  if callIsolator then
-    Result := RunIsolatorInitialize;
+  if callIsolator then begin
+    if RunIsolatorInitialize = -1 then begin
+      Result := -1;
+      Exit;
+    end;
+  end;
 
   // 各オプションの設定
   try
@@ -261,7 +265,7 @@ begin
     begin
       AddMessage('You selected:');
       for i := 0 to opts.Count - 1 do
-        AddMessage(opts.Names[i] + ' - ' + opts.ValueFromIndex[i]);
+        AddMessage('  ' + opts.Names[i] + ' - ' + opts.ValueFromIndex[i]);
     end
     else begin
       AddMessage('Selection was canceled.');
@@ -309,15 +313,17 @@ begin
     opts.Free;
     disableOpts.Free;
   end;
-  AddMessage('Config Generator Initialize Finish!');
+  AddMessage('Config Generator Initialize Finish.');
 end;
 
 function Process(e: IInterface): integer;
 
 var
-  replacerFlags, templateFlags, replacerRaceElement, replacerVoiceTypeElement, replacerOutfitElement, targetFlags, targetRaceElement, targetVoiceTypeElement, targetOutfitElement: IInterface;
-  replacerRecord, targetRecord, replacerRaceRecord, replacerVoiceTypeRecord, replacerOutfitRecord, targetRaceRecord, targetVoiceTypeRecord, targetOutfitRecord: IwbMainRecord;
+  // replacerFlags, targetFlags: IInterface; // 今は未使用だが今後利用する可能性はある変数なので残しておく。
+  replacerNPCIsFemale, targetNPCIsFemale, useTraits: boolean; // NPCフラグ格納用
   replacerName, targetName: string;
+  replacerRecord, replacerRaceRecord, replacerVoiceTypeRecord, replacerOutfitRecord: IwbMainRecord;
+  targetRecord, targetRaceRecord, targetVoiceTypeRecord, targetOutfitRecord: IwbMainRecord;
   replacerFormIDNative, targetFormIDNative, underscorePos: Cardinal;
   originalTargetID, recordSignature, targetFormIDHex, replacerFormIDHex, targetEditorID, replacerEditorID: string; // レコードID関連
   localTargetFormID, localReplacerFormID,
@@ -325,7 +331,7 @@ var
   paddedTargetFormID, paddedReplacerFormID: string; // FormIDを記入用に加工した文字列
   exportTargetID, exportReplacerID, wnamID, exportSkinID, exportRace, exportGender,
   exportName, exportVoiceType, exportOutfit: string; // SkyPatcher, Recast設定ファイルの記入用
-  useTraits: boolean;
+
 begin
   targetFormIDHex    := '';
   targetEditorID  := '';
@@ -337,7 +343,7 @@ begin
 
   // NPCレコードでなければスキップ
   if Signature(e) <> 'NPC_' then begin
-    AddMessage(GetElementEditValues(e, 'EDID') + ' is not NPC record.');
+    //AddMessage(EditorID(e) + ' is not NPC record.');
     Exit;
   end;
 
@@ -354,7 +360,7 @@ begin
   replacerFormIDHex := IntToHex64(replacerFormIDNative, 8);
    //AddMessage('Replacer Form ID: ' + IntToStr(replacerFormID));
    //AddMessage('Replacer Form ID: ' + IntToHex(replacerFormID, 8));
-  replacerEditorID := GetElementEditValues(replacerRecord, 'EDID');
+  replacerEditorID := EditorID(replacerRecord);
   // AddMessage('Replacer Editor ID: ' + replacerEditorID);
 
   // リプレイサーNPCのEditor IDからオリジナルのEditor IDを取得
@@ -362,6 +368,7 @@ begin
   originalTargetID := Copy(replacerEditorID, underscorePos + 1, Length(replacerEditorID) - underscorePos);
 
   // オリジナルのEditor IDからターゲットNPCのレコードを取得
+  AddMessage('Searching for target record...');
   targetRecord := FindRecordByRecordID(originalTargetID, 'NPC_', USE_EDITOR_ID);
 
   if not Assigned(targetRecord) then begin
@@ -370,46 +377,42 @@ begin
   end;
   AddMessage('Found record: ' + Name(targetRecord));
   targetFileName := GetFileName(targetRecord);
-  AddMessage('Target file name set to: ' + targetFileName);
+  //AddMessage('Target file name set to: ' + targetFileName);
 
   // ターゲットNPCのFormID,EditorIDを取得
   //targetFormID := IntToHex64(GetElementNativeValues(targetRecord, 'Record Header\FormID'), 8);
   targetFormIDNative := GetElementNativeValues(targetRecord, 'Record Header\FormID');
   targetFormIDHex := IntToHex64(targetFormIDNative, 8);
     //AddMessage('Target Record Form ID: ' + targetFormID);
-  targetEditorID := GetElementEditValues(targetRecord, 'EDID');
+  targetEditorID := EditorID(targetRecord);
     //AddMessage('Target Record Editor ID: ' + targetEditorID);
 
   // リプレイサーNPCのフラグ、種族、名前、音声タイプ、装備を取得
-  replacerFlags            := ElementByPath(replacerRecord, 'ACBS - Configuration');
-  replacerRaceElement      := ElementByPath(replacerRecord, 'RNAM');
-  replacerRaceRecord       := MasterOrSelf(LinksTo(replacerRaceElement));
-  replacerName             := GetElementEditValues(replacerRecord, 'FULL');
-  replacerVoiceTypeElement := ElementByPath(replacerRecord, 'VTCK');
-  replacerVoiceTypeRecord  := MasterOrSelf(LinksTo(replacerVoiceTypeElement));
-  replacerOutfitElement    := ElementByPath(replacerRecord, 'DOFT');
-  replacerOutfitRecord     := MasterOrSelf(LinksTo(replacerOutfitElement));
+  //replacerFlags            := ElementByPath(replacerRecord, 'ACBS - Configuration');
+  replacerNPCIsFemale     := IsNPCFemale(replacerRecord);
+  replacerName            := GetElementEditValues(replacerRecord, 'FULL');
+  replacerRaceRecord      := GetLinkedMasterRecord(replacerRecord, 'RNAM');
+  replacerVoiceTypeRecord := GetLinkedMasterRecord(replacerRecord, 'VTCK');
+  replacerOutfitRecord    := GetLinkedMasterRecord(replacerRecord, 'DOFT');
 
-  // レコードがuse traitsフラグを持っているか確認し、持っていた場合はスキップ
-  templateFlags := ElementByPath(replacerFlags, 'Template Flags');
-  useTraits := GetElementNativeValues(templateFlags, 'Use Traits') <> 0;
+  // レコードがuse traitsフラグを持っているか確認し、持っていた場合は専用処理に入る
+  useTraits := IsNPCUsingTraits(replacerRecord);
 
   if useTraits then begin
     AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
-    AddMessage('This NPC Record has Use Traits Template Flag. Config generation will be skipped.');
+    AddMessage('  This NPC Record has Use Traits Template Flag. Config generation will be skipped.');
     AddMessage('--------------------------------------------------------------------------------------------------------------------------------------------------');
     Exit;
   end;
 
   // ターゲットNPCのフラグ、種族、名前、音声タイプ、装備を取得
-  targetFlags            := ElementByPath(targetRecord, 'ACBS - Configuration');
-  targetRaceElement      := ElementByPath(targetRecord, 'RNAM');
-  targetRaceRecord       := MasterOrSelf(LinksTo(targetRaceElement));
-  targetName             := GetElementEditValues(targetRecord, 'FULL');
-  targetVoiceTypeElement := ElementByPath(targetRecord, 'VTCK');
-  targetVoiceTypeRecord  := MasterOrSelf(LinksTo(targetVoiceTypeElement));
-  targetOutfitElement    := ElementByPath(targetRecord, 'DOFT');
-  targetOutfitRecord     := MasterOrSelf(LinksTo(targetOutfitElement));
+  //targetFlags            := ElementByPath(targetRecord, 'ACBS - Configuration');
+  targetNPCIsFemale     := IsNPCFemale(targetRecord);
+  targetName            := GetElementEditValues(targetRecord, 'FULL');
+  targetRaceRecord      := GetLinkedMasterRecord(targetRecord, 'RNAM');
+  targetVoiceTypeRecord := GetLinkedMasterRecord(targetRecord, 'VTCK');
+  targetOutfitRecord    := GetLinkedMasterRecord(targetRecord, 'DOFT');
+
 
   // 各設定行の出力が有効かつdisableAllがOFFの場合のみ、比較判定を行う
   // disableAllがONの場合は、Initializeで既に全てコメントアウトに設定済みなので何もしない
@@ -424,15 +427,17 @@ begin
 
     if outputRace then begin
       slCommentOut.Values['Race'] := '';
-      // 種族が同じ場合はコメントアウト
-      if GetElementNativeValues(replacerRaceRecord, 'Record Header\FormID') = GetElementNativeValues(targetRaceRecord, 'Record Header\FormID') then
+      // 種族が未設定、または種族が同じ場合はコメントアウト
+      if not Assigned(replacerRaceRecord) then
+        slCommentOut.Values['Race'] := coChar
+      else if GetElementNativeValues(replacerRaceRecord, 'Record Header\FormID') = GetElementNativeValues       (targetRaceRecord, 'Record Header\FormID') then
         slCommentOut.Values['Race'] := coChar;
     end;
 
     if outputGender then begin
       slCommentOut.Values['Gender'] := '';
       // 性別が同じ場合はコメントアウト
-      if GetElementEditValues(targetFlags, 'Flags\Female') = GetElementEditValues(replacerFlags, 'Flags\Female') then
+      if replacerNPCIsFemale = targetNPCIsFemale then
         slCommentOut.Values['Gender'] := coChar;
     end;
 
@@ -445,30 +450,27 @@ begin
 
     if outputVoiceType then begin
       slCommentOut.Values['VoiceType'] := '';
-      // 音声タイプが同じ場合はコメントアウト
-      if GetElementNativeValues(replacerVoiceTypeRecord, 'Record Header\FormID') = GetElementNativeValues(targetVoiceTypeRecord, 'Record Header\FormID') then
+      // 音声タイプが未設定、または同じ場合はコメントアウト
+      if not Assigned(replacerVoiceTypeRecord) then
+        slCommentOut.Values['VoiceType'] := coChar
+      else if GetElementNativeValues(replacerVoiceTypeRecord, 'Record Header\FormID') = GetElementNativeValues(targetVoiceTypeRecord, 'Record Header\FormID') then
         slCommentOut.Values['VoiceType'] := coChar;
     end;
 
     if outputOutfit then begin
       slCommentOut.Values['Outfit'] := '';
-      // 出力が同じ場合はコメントアウト
-      if GetElementNativeValues(replacerOutfitRecord, 'Record Header\FormID') = GetElementNativeValues(targetOutfitRecord, 'Record Header\FormID') then
+      // 衣装が未設定、または同じ場合はコメントアウト
+      if not Assigned(replacerOutfitRecord) then
+        slCommentOut.Values['Outfit'] := coChar
+      else if GetElementNativeValues(replacerOutfitRecord, 'Record Header\FormID') = GetElementNativeValues(targetOutfitRecord, 'Record Header\FormID') then
         slCommentOut.Values['Outfit'] := coChar;
     end;
   end;
 
   // 出力ファイル用の配列操作
   // FormIDを8桁の16進数文字列に変換し、プラグイン内で有効な値を取り出す
-  if  UpperCase(Copy(targetFormIDHex, 1, 2)) = 'FE' then
-    localTargetFormID := Copy(targetFormIDHex, 6, 8)
-  else
-    localTargetFormID := Copy(targetFormIDHex, 3, 8);
-
-  if  UpperCase(Copy(replacerFormIDHex, 1, 2)) = 'FE' then
-    localReplacerFormID := Copy(replacerFormIDHex, 6, 8)
-  else
-    localReplacerFormID := Copy(replacerFormIDHex, 3, 8);
+  localTargetFormID := ExtractLocalFormIDHex(targetFormIDHex);
+  localReplacerFormID := ExtractLocalFormIDHex(replacerFormIDHex);
 
   if useFormID then begin
     if framework = 'Recast' then begin
@@ -521,7 +523,7 @@ begin
       exportSkinID := replacerFileName + '|' + wnamID;
 
     // 性別フラグの判定
-    if GetElementEditValues(replacerFlags, 'Flags\Female') = 1 then
+    if replacerNPCIsFemale then
       exportGender := ':setFlags=female'
     else
       exportGender := ':removeFlags=female';
@@ -534,7 +536,7 @@ begin
       exportSkinID := wnamID + '~' + replacerFileName;
 
     // 性別フラグの判定
-    if GetElementEditValues(replacerFlags, 'Flags\Female') = 1 then
+    if replacerNPCIsFemale then
       exportGender := 'female'
     else
       exportGender := 'male';

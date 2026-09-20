@@ -1,18 +1,18 @@
 {
   ==============================================================================
-   NPCReplacerConverter_ConfigGenerator.pas
+   NPC Replacer Converter.pas
   ==============================================================================
 
    Description:
      This script is part of the "NPC Replacer Converter" toolset.
      It functions as the *Config Generator (ConfigGen)* phase, executed after
-     the CoreProcess. Its purpose is to create configuration files for
+     the Isolator. Its purpose is to create configuration files for
      **SkyPatcher**, **Race Distribution Framework (RDF)**, or **Recast** based
      on user-selected options and NPC record data gathered from the list of
      plugins currently loaded in xEdit.
 
    Features:
-     - Integrates seamlessly with the CoreProcess phase (optional).
+     - Integrates seamlessly with the Isolator phase (optional).
      - Prompts user to select output framework (SkyPatcher / RDF / Recast)
        and generation options via checkboxes.
      - Scans and compares NPC records (original vs. replacer) to determine
@@ -23,15 +23,15 @@
 
    Usage:
      1. Run this script in xEdit (SSEEdit) on your replacer plugin.
-     2. Select whether to run in Integration Mode (to invoke CoreProcess).
+     2. Select whether to run in Integration Mode (to invoke Isolator).
      3. Choose your config generation target (SkyPatcher / RDF / Recast).
      4. Select desired options in the checklist dialog.
      5. The script will process NPC records and output a ready-to-use config file.
 
    Notes:
       - Intended for Skyrim SE/AE with SkyPatcher, RDF, and Recast support.
-      - Uses `NPC Replacer Converter - Core.pas` when Integration Mode is selected.
-      - This script can also be run standalone if the CoreProcess has already been applied.
+      - Uses `NPC Replacer Isolator.pas` when Integration Mode is selected.
+      - This script can also be run standalone if the Isolator Process has already been applied.
       - Compatible with both FormID- and EditorID-based reference methods.
       - Recast does not support Race replacement or Outfit output.
 
@@ -47,10 +47,10 @@
   ==============================================================================
 }
 
-unit NPCReplacerConverter_ConfigGenerator;
+unit NPCReplacerConverter;
 
-uses 'NPCReplacerConverter_Core';
-uses 'NPC Replacer Converter - Shared\NPCRC_CommonUtils';
+uses 'NPC Replacer Isolator';
+uses 'xEdit_mmskCommonLibrary\xEdit_mmskCommonLibrary';
 
 const
   USE_EDITOR_ID = false;
@@ -60,8 +60,8 @@ var
   slExport, slCommentOut: TStringList;
   coChar, targetFileName, replacerFileName: string;
 
-  // イニシャル処理で設定・使用する変数
-  callCoreProcess, useFormID, disableAll, replaceVS: boolean;
+  // イニシャライズ処理で設定・使用する変数
+  callIsolator, useFormID, disableAll, replaceVS: boolean;
 
   // 選択中のフレームワーク ('SkyPatcher' / 'RDF' / 'Recast')
   framework: string;
@@ -160,7 +160,7 @@ begin
   slCommentOut        := TStringList.Create;
   coChar              := '';
 
-  callCoreProcess     := false;
+  callIsolator     := false;
   useFormID           := false;
 
   disableAll          := false;
@@ -182,10 +182,10 @@ begin
 
   if MessageDlg(
     'Run in Integration Mode?' + #13#10 +
-    'Yes = Run with CoreProcess' + #13#10 +
-    'No = Run ConfigGenerator only', mtConfirmation, [mbYes, mbNo], 0
+    'Yes = Run with Isolator Process' + #13#10 +
+    'No = Run Converter only', mtConfirmation, [mbYes, mbNo], 0
     ) = mrYes then
-    callCoreProcess := true;
+    callIsolator := true;
 
   // フレームワーク選択（チェックボックス方式、排他制御あり）
   framework := SelectFramework;
@@ -220,8 +220,8 @@ begin
   else
     checkBoxCaption := 'Choose RDF Option';
 
-  if callCoreProcess then
-    Result := RunCoreProcessInitialize;
+  if callIsolator then
+    Result := RunIsolatorInitialize;
 
   // 各オプションの設定
   try
@@ -344,8 +344,8 @@ begin
   // リプレイサーMod名を取得
   replacerFileName := GetFileName(GetFile(e));
 
-  if callCoreProcess then
-    Result := RunCoreProcess(e, replacerRecord)
+  if callIsolator then
+    Result := RunIsolatorProcess(e, replacerRecord)
   else
     replacerRecord := e;
 
@@ -609,8 +609,8 @@ var
 begin
   savedFile := false;
 
-  if callCoreProcess then
-    RunCoreProcessFinalize;
+  if callIsolator then
+    RunIsolatorFinalize;
 
   // データがない場合はスキップ
   if slExport.Count = 0 then begin

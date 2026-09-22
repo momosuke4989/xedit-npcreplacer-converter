@@ -54,6 +54,7 @@ uses 'xEdit_mmskCommonLibrary\xEdit_mmskCommonLibrary';
 
 const
   USE_EDITOR_ID = false;
+  SCRIPT_NAME = 'NPC Replacer Converter';
 
 var
   // 設定ファイル出力用変数
@@ -351,7 +352,7 @@ begin
   replacerFileName := GetFileName(GetFile(e));
 
   if callIsolator then
-    Result := RunIsolatorProcess(e, replacerRecord)
+    Result := RunIsolatorProcess(e, replacerRecord, SCRIPT_NAME)
   else
     replacerRecord := e;
 

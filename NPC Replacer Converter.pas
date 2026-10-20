@@ -74,7 +74,7 @@ function GenerateVisualStyleString(const targetID, replacerID, fw: string): stri
 begin
   Result := '';
   if fw = 'SkyPatcher' then
-    Result := 'filterByNpcs=' + TargetID + ':copyVisualStyle=' + ReplacerID
+    Result := 'filterByNpcs=' + TargetID + ':filterByTemplate=' + TargetID + ':restrictToTemplateFlags=traits' + ':copyVisualStyle=' + ReplacerID
   else if fw = 'Recast' then
     Result := 'face = "' + ReplacerID + '"'
   else
@@ -555,7 +555,7 @@ begin
 
     // 各設定行は対応するoutputフラグがONの場合のみ出力
     if outputSkin then
-      slExport.Add(slCommentOut.Values['Skin'] + 'filterByNpcs=' + exportTargetID + ':skin=' + exportSkinID);
+      slExport.Add(slCommentOut.Values['Skin'] + 'filterByNpcs=' + exportTargetID + ':filterByTemplate=' + exportTargetID + ':restrictToTemplateFlags=traits' + ':skin=' + exportSkinID);
 
     if outputRace then
       slExport.Add(slCommentOut.Values['Race'] + 'filterByNpcs=' + exportTargetID + ':race=' + exportRace);
